@@ -1,5 +1,5 @@
-container = document.querySelector(".container");
-
+const container = document.querySelector(".container");
+let clicked = false; 
 class Disc {
     constructor(tower, index, len, posX, posY) {
         this.tower = tower;
@@ -15,6 +15,7 @@ class Disc {
         this.posX = posX;
         this.posY = posY;
         this.activated = false;
+        this.isFirst = false;
     }
     get getElt() {
         return this.elt;
@@ -40,6 +41,9 @@ class Disc {
     set setPosY(posY) {
         this.posY = posY;
     }
+    set setElement(elt) {
+        this.elt = elt;
+    }
     setPosition() { // Setting the disc's position
         let width = this.elt.style.width.split('px')[0];
         this.elt.style.top = this.posX + "px";
@@ -55,29 +59,36 @@ class Disc {
     addActiveClass() { // Add "active" to the disc's class
         this.elt.classList.add("active");
     }
+    addFirstClass() {// Add "active" to the disc's class
+        this.elt.classList.add("first");
+    }
     removeActiveClass() { // Remove "active" to the disc's class
         if (this.elt.classList.contains("active"))
             this.elt.classList.remove("active");
     }
-    handleClick() {
-        this.posX = container.offsetTop;
-        this.updatePos();
-        this.addActiveClass();
+    removeFirstClass() { // Remove "active" to the disc's class
+        if (this.elt.classList.contains("first"))
+            this.elt.classList.remove("first");
     }
-    activate() { // Make the disc able to listen to click and directly add "active" to its' element class
-        if (!this.activated) {
-            this.elt.addEventListener('click', this.handleClick.bind(this));
-            this.activated = true;
+    handleClick() {
+        if (this.isFirst /* & !clicked */){
+            this.posX = container.offsetTop;
+            this.updatePos();
+            this.addActiveClass();
+            this.addFirstClass();
+            // clicked = true;
         }
+    }
+    activate() { // Make the disc able to listen to click and directly add "active" to its element class
+        this.elt.addEventListener('click', this.handleClick.bind(this));
+        // if(!clicked)
+            this.activated = true;
     }
     deactivate() { // 
-        if (this.activated) {
-            this.elt.removeEventListener('click', this.handleClick.bind(this));
-            this.activated = false;
-            console.log("deactivated : ");
-            console.log(this);
-        }
+        this.isFirst = false;
+        this.activated = false;
         this.removeActiveClass();
+        this.removeFirstClass();
     }
 };
 
@@ -99,6 +110,7 @@ class Tower {
         }
         this.posX = 0;
         this.posY = 0;
+        this.activateAllElt();
     }
     get getLabel() {
         return this.label;
@@ -151,9 +163,8 @@ class Tower {
     }
     activateFirstElt() { // Activate the first disc of the tower
         if (this.tab.length > 0) {
+            this.tab[this.tab.length - 1].isFirst = true;
             this.tab[this.tab.length - 1].activate();
-            console.log("activating first elt : ");
-            console.log(this.tab[this.tab.length - 1]);
         }
     }
     activateAllElt() { // Activate all the discs of the tower
@@ -169,6 +180,14 @@ class Tower {
                 this.tab[i].deactivate();
             }
         }
+    }
+    getDiscWithActiveClass() { // return the active disc with it's index inside an object
+        for (let i = 0; i < this.tab.length; i++) {
+            if (this.tab[i].getElt.classList.contains("active")) {
+                return { "activeDisc": this.tab[i], "index": i }
+            }
+        }
+        return { "activeDisc": "none", "index": -1 };
     }
 };
 
@@ -212,14 +231,61 @@ class Grid {
             })
         }
     }
+    activateOnlyFirst() {
+        for (let i = 0; i < grid.towerNumber; i++) {
+            for (let j = 0; j < this.towers[i].tab.length; j++) {
+                this.towers[i].tab[j].removeActiveClass();
+                this.towers[i].tab[j].isFirst = false;
+            }
+            this.towers[i].activateAllElt();
+            this.towers[i].activateFirstElt();
+        }
+    }
+    getActiveTower() { // returns the active tower and it's index in the grid in an object
+        for (let i = 0; i < this.towers.length; i++) {
+            if (this.towers[i].active == true) { // if we find the active tower
+                return { "activeTower": this.towers[i], "index": i };
+            }
+        }
+        return {"activeTower": "none", "index": -1}
+    }
+    handleDiscExchange(activeTower, activeDisc) {
+        let label = activeDisc.getTowerLabel;
+        // update its index and label
+        activeDisc.setTower = activeTower.getLabel;
+        activeDisc.setIndex = activeTower.getTab.length;
+        // put it inside the active tower
+        activeTower.getTab.push(activeDisc);
+        // update the discNumber of the active tower
+        activeTower.discNumber += 1;
+        // remove the disc from its last tower
+        this.towers[label].getTab.pop();
+        this.towers[label].discNumber -= 1;
+        // deactivate all the element in this.towers (for security)
+        // and activate only the first element
+        this.activateOnlyFirst();
+        // update position
+        activeTower.setDiscPosition();
+        // release the click
+        // clicked = false;
+    }
+    getActiveDisc(){
+        for (let i=0; i<this.towers.length; i++){
+            let {activeDisc, index} = this.towers[p].getActiveDisc();
+            if(activeDisc != "none"){
+                return activeDisc;
+            }
+        }
+        return "none";
+    }
 };
 
 let grid = new Grid(3, 7);
 grid.createTowers();
 grid.place();
-/* grid.activateClickedTower(); */
-
 window.addEventListener('click', (e) => {
+    let getActiveTower = grid.getActiveTower();
+    let lastActiveTower = getActiveTower.activeTower;
     if (e.target.classList.contains("disc")) {
         // get the actual position of the mouse
         let left = e.clientX;
@@ -228,162 +294,107 @@ window.addEventListener('click', (e) => {
         ext:
         for (let i = 0; i < grid.towerNumber; i++) {
             let tower = grid.getTowers[i]; // for readability
-            // deactivate the actual tower
-            tower.setActive = false;
             let towerElt = tower.getElt;
             let rect = towerElt.getBoundingClientRect();
             if ((rect.top < top & top < rect.top + rect.height)
                 & (rect.left < left & left < rect.left + rect.width)) {
-                tower.setActive = true;
+                lastActiveTower.setActive = false; // first, deactivate the last active tower
+                tower.setActive = true; // then, activate the new one
                 break ext;
+/*                 if(clicked){
+                    lastActiveTower.setActive = false; // first, deactivate the last active tower
+                    tower.setActive = true; // then, activate the new one
+                    break ext;
+                }
+                else{
+                    lastActiveTower.setActive = true;
+                 }*/
             }
 
         }
     }
-})
+});
 
 window.addEventListener("keydown", (e) => { // Listening to the keydown event
+
     if (e.key == "ArrowRight") {
         // Find the active tower
-        let activeTower = [];
+        let { activeTower, index } = grid.getActiveTower();
+        console.log("active tower : ");
+        console.log(activeTower);
         let towers = grid.getTowers;
-        ext:
-        for (let i = 0; i < towers.length; i++) {
-            if (towers[i].active == true) { // if we find the active tower
-                if (towers[i + 1] != undefined) { // and there is still a tower at it's right
-                    towers[i].setActive = false;
-                    towers[i + 1].setActive = true;
-                    activeTower = towers[i + 1];
-                    break ext;
-                }
-                else {
-                    activeTower = towers[i];
-                }
-            }
+        if (towers[index+1] != undefined) {
+            activeTower.setActive = false;
+            towers[index+1].setActive = true;
+            activeTower = towers[index+1]
         }
-
         // Place the active disc at the top of the active tower
         /// Find the active disc
         ext1:
         for (let i = 0; i < towers.length; i++) {
-            let tab = towers[i].getTab;
-            for (let j = 0; j < tab.length; j++) {
-                if (tab[j].getElt.classList.contains("active")) {
-                    let rect = activeTower.getBase.getBoundingClientRect();
-                    let width = parseInt(tab[j].getElt.style.width.split('px')[0]);
-                    tab[j].setPosY = rect.left + Math.floor((rect.width - width) / 2);
-                    tab[j].updatePos();
-                    break ext1;
-                }
+            let { activeDisc, index } = towers[i].getDiscWithActiveClass();
+            if (activeDisc != "none") {
+                let rect = activeTower.getBase.getBoundingClientRect();
+                let width = parseInt(activeDisc.getElt.style.width.split('px')[0]);
+                activeDisc.setPosY = rect.left + Math.floor((rect.width - width) / 2);
+                activeDisc.updatePos();
+                break ext1;
             }
         }
     }
     else if (e.key == "ArrowLeft") {
         // Find the active tower
+        let { activeTower, index } = grid.getActiveTower();
         let towers = grid.getTowers;
-        let activeTower = [];
-        ext:
-        for (let i = 0; i < towers.length; i++) {
-            if (towers[i].active == true) { // if we find the active tower
-                if (towers[i - 1] != undefined) { // and there is still a tower at it's left
-                    towers[i].setActive = false;
-                    towers[i - 1].setActive = true;
-                    activeTower = towers[i - 1];
-                    break ext;
-                }
-                else {
-                    activeTower = towers[i];
-                }
-            }
+        if (towers[index - 1] != undefined) {
+            activeTower.setActive = false;
+            towers[index-1].setActive = true;
+            activeTower = towers[index-1];
         }
         /// Find the active disc
         ext1:
         for (let i = 0; i < towers.length; i++) {
-            let tab = towers[i].getTab;
-            for (let j = 0; j < tab.length; j++) {
-                if (tab[j].getElt.classList.contains("active")) {
-                    let rect = activeTower.getBase.getBoundingClientRect();
-                    let width = parseInt(tab[j].getElt.style.width.split('px')[0]);
-                    tab[j].setPosY = rect.left + Math.floor((rect.width - width) / 2);
-                    tab[j].updatePos();
-                    break ext1;
-                }
+            let { activeDisc, index } = towers[i].getDiscWithActiveClass();
+            if (activeDisc != "none") {
+                let rect = activeTower.getBase.getBoundingClientRect();
+                let width = parseInt(activeDisc.getElt.style.width.split('px')[0]);
+                activeDisc.setPosY = rect.left + Math.floor((rect.width - width) / 2);
+                activeDisc.updatePos();
+                break ext1;
             }
         }
     }
     else if (e.key == "ArrowDown") {
         // Find the active tower
         let towers = grid.getTowers;
-        let activeTower = [];
-        ext:
-        for (let i = 0; i < towers.length; i++) {
-            if (towers[i].active == true) { // if we find the active tower
-                activeTower = towers[i];
-                break ext;
-            }
-        }
-        /// Find the active disc that has the "active" class and put it on the active tower
-        ext1:
-        for (let i = 0; i < towers.length; i++) {
-            let tab = towers[i].getTab;
-            for (let j = 0; j < tab.length; j++) {
-                if (tab[j].getElt.classList.contains("active")) {
-                    index = tab[j].getIndex;
-                    label = tab[j].getTowerLabel;
-                    // update its index and label
-                    tab[j].setTower = activeTower.getLabel;
-                    tab[j].setIndex = activeTower.getTab.length;
-                    // remove the "active" class to the active disc
-                    tab[j].removeActiveClass();
-                    // check if there is is already an bigger disc in the active tower
-                    /*                     if (activeTower.getTab.length > 0) { // if there is already an element
-                                            if (activeTower.getTab[activeTower.getTab.length - 1].getLen < tab[j].getLen) {
-                                                tab[j].addActiveClass();
-                                                break ext1;
-                                            } */
-                    // else {
-                    // put it inside the active tower
-                    activeTower.getTab.push(tab[j]);
-                    // remove the disc from its last tower
-                    towers[label].getTab.splice(index, 1);
-                    towers[label].discNumber -= 1;
-                    // deactivate the activeTower
-                    activeTower.setActive = false;
-                    // update the discNumber of the active tower
-                    activeTower.setDiscNumber = activeTower.getTab.length;
-                    // update position
-                    activeTower.setDiscPosition();
-                    //deactivate all the element in all towers (for security)
-                    // and activate only the first element
-                    console.log("new step");
-                    for (let p = 0; p < grid.towerNumber; p++) {
-                        grid.getTowers[p].deactivateAllElt();
-                        grid.getTowers[p].activateFirstElt();
+        let { activeTower, towerIndex } = grid.getActiveTower();
+        if (activeTower) {
+            ext1:
+            /// Find the active disc that has the "active" class and put it on the active tower
+            for (let i = 0; i < towers.length; i++) {
+                ({ activeDisc, discIndex } = towers[i].getDiscWithActiveClass());
+                if (activeDisc != "none") {
+                    label = activeDisc.getTowerLabel;
+                    // check if active tower is the actual tower of the disc
+                    if (activeTower == towers[label]) {
+                        // update position
+                        activeTower.setDiscPosition()
+                        break ext1;
                     }
-                    break ext1;
+                    // check if there is already a smaller disc 
+                    let lenActive = activeTower.getTab.length;
+                    let lenCurrent = activeDisc.getLen;
+                    if (lenActive > 0) {
+                        if (activeTower.getTab[lenActive - 1].getLen >= lenCurrent) {
+                            grid.handleDiscExchange(activeTower, activeDisc);
+                            break ext1;
+                        }
+                    }
+                    else {
+                        grid.handleDiscExchange(activeTower, activeDisc);
+                        break ext1;
+                    }
                 }
-                // }
-                /*                     else {
-                                        // put it inside the active tower
-                                        activeTower.getTab.push(tab[j]);
-                                        // remove the disc from its last tower
-                                        towers[label].getTab.splice(index, 1);
-                                        towers[label].discNumber -= 1;
-                                        // deactivate the activeTower
-                                        activeTower.setActive = false;
-                                        // update the discNumber of the active tower
-                                        activeTower.setDiscNumber = activeTower.getTab.length;
-                                        // update position
-                                        activeTower.setDiscPosition();
-                                        //deactivate all the element in all towers (for security)
-                                        // and activate only the first element
-                                        for (let p = 0; p < grid.towerNumber; p++) {
-                                            grid.getTowers[p].deactivateAllElt();
-                                            grid.getTowers[p].activateFirstElt();
-                                        }
-                                        break ext1;
-                                    } */
-                // }
             }
         }
     }
