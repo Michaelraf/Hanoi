@@ -1,5 +1,8 @@
 const container = document.querySelector(".container");
-let clicked = false; 
+const solve = document.getElementById("solve");
+const init = document.getElementById("init");
+const discNumber = 7;
+let canClick = true;
 class Disc {
     constructor(tower, index, len, posX, posY) {
         this.tower = tower;
@@ -7,6 +10,7 @@ class Disc {
         this.len = len;
         this.elt = document.createElement('div');
         this.elt.classList.add("disc");
+        this.elt.id = len;
         this.elt.style.width = 50 + 18 * this.len + 'px';
         let color1 = /* Math.floor(Math.random()*255); */ 79;
         let color2 = /* Math.floor(Math.random()*255); */ 155;
@@ -44,12 +48,7 @@ class Disc {
     set setElement(elt) {
         this.elt = elt;
     }
-    setPosition() { // Setting the disc's position
-        let width = this.elt.style.width.split('px')[0];
-        this.elt.style.top = this.posX + "px";
-        this.elt.style.left = this.posY + "px";
-    }
-    putToTower() { // Append the tower to the document
+    putToTower() { // Append the Disc to the container
         container.appendChild(this.elt);
     }
     updatePos() { // Update the top and the left of the element of the disc
@@ -59,7 +58,7 @@ class Disc {
     addActiveClass() { // Add "active" to the disc's class
         this.elt.classList.add("active");
     }
-    addFirstClass() {// Add "active" to the disc's class
+    addFirstClass() { // Add "active" to the disc's class
         this.elt.classList.add("first");
     }
     removeActiveClass() { // Remove "active" to the disc's class
@@ -71,24 +70,23 @@ class Disc {
             this.elt.classList.remove("first");
     }
     handleClick() {
-        if (this.isFirst /* & !clicked */){
+        if (this.isFirst & canClick) {
             this.posX = container.offsetTop;
             this.updatePos();
             this.addActiveClass();
             this.addFirstClass();
-            // clicked = true;
+            canClick = false;
         }
     }
-    activate() { // Make the disc able to listen to click and directly add "active" to its element class
-        this.elt.addEventListener('click', this.handleClick.bind(this));
-        // if(!clicked)
-            this.activated = true;
+    activate() { // Set activated to true
+        this.activated = true;
     }
     deactivate() { // 
         this.isFirst = false;
         this.activated = false;
         this.removeActiveClass();
         this.removeFirstClass();
+        canClick = true;
     }
 };
 
@@ -153,7 +151,7 @@ class Tower {
             let width = parseInt(this.tab[i].getElt.style.width.split('px')[0]);
             this.tab[i].setPosX = rect.top - (i) * 28 - 28;
             this.tab[i].setPosY = rect.left + Math.floor((rect.width - width) / 2);
-            this.tab[i].setPosition();
+            this.tab[i].updatePos();
         }
     }
     putDiscsToTower() { // Put discs to its' tower
@@ -164,7 +162,8 @@ class Tower {
     activateFirstElt() { // Activate the first disc of the tower
         if (this.tab.length > 0) {
             this.tab[this.tab.length - 1].isFirst = true;
-            this.tab[this.tab.length - 1].activate();
+            this.tab[this.tab.length - 1].activated = true;
+            this.tab[this.tab.length - 1].addFirstClass();
         }
     }
     activateAllElt() { // Activate all the discs of the tower
@@ -189,6 +188,9 @@ class Tower {
         }
         return { "activeDisc": "none", "index": -1 };
     }
+    getLastDisc() {
+        return this.tab[this.tab.length - 1];
+    }
 };
 
 class Grid {
@@ -211,10 +213,41 @@ class Grid {
         this.towers[0].setActive = true;
         this.towers[0].activateFirstElt();
     }
+    init() {
+        for (let i = 1; i < this.towerNumber; i++) {
+            for (let j = 0; j < this.towers[i].getTab.length; j++) {
+                // update the disc tower
+                this.towers[i].getTab[j].setTower = 0;
+                this.towers[i].getTab[j].setIndex = this.discNumber - this.towers[i].getTab[j].getLen;
+                // push the disc inside the first tower
+                this.towers[0].getTab.push(this.towers[i].getTab[j]);
+                // update the disc number in the tower
+                this.towers[0].setDiscNumber = this.towers[0].getDiscNumber + 1;
+                // deactivate the other towers
+                this.towers[i].getTab[j].setActive = false;
+            }
+            // remove the element from it's actual tower
+            this.towers[i].getTab.pop();
+        }
+        // sort the disc inside the first tower by len
+        this.towers[0].tab.sort((a, b) => a.getLen > b.getLen ? -1 : 1);
+        // Activate the first disc
+        this.towers[0].getTab[this.towers[0].getTab.length - 1].isFirst = true;
+        this.towers[0].getTab[this.towers[0].getTab.length - 1].addFirstClass();
+        // deactivate the first tower
+        this.towers[0].setActive = false;
+        // Set disc position in the tower
+        this.towers[0].setDiscPosition();
+        for (let i = 0; i < this.towers[0].getTab.length; i++) {
+            this.towers[0].getTab[i].updatePos();
+        }
+    }
     place() { // put all tower inside document
 
         for (let i = 0; i < this.towerNumber; i++) {
             this.towers[i].put();
+        }
+        for (let i = 0; i < this.towerNumber; i++) {
             this.towers[i].setDiscPosition();
             this.towers[i].putDiscsToTower();
         }
@@ -232,12 +265,12 @@ class Grid {
         }
     }
     activateOnlyFirst() {
-        for (let i = 0; i < grid.towerNumber; i++) {
+        for (let i = 0; i < this.towerNumber; i++) {
             for (let j = 0; j < this.towers[i].tab.length; j++) {
                 this.towers[i].tab[j].removeActiveClass();
+                this.towers[i].tab[j].removeFirstClass();
                 this.towers[i].tab[j].isFirst = false;
             }
-            this.towers[i].activateAllElt();
             this.towers[i].activateFirstElt();
         }
     }
@@ -247,13 +280,14 @@ class Grid {
                 return { "activeTower": this.towers[i], "index": i };
             }
         }
-        return {"activeTower": "none", "index": -1}
+        return { "activeTower": "none", "index": -1 }
     }
     handleDiscExchange(activeTower, activeDisc) {
         let label = activeDisc.getTowerLabel;
         // update its index and label
         activeDisc.setTower = activeTower.getLabel;
         activeDisc.setIndex = activeTower.getTab.length;
+        activeDisc.setTower = activeTower.getLabel;
         // put it inside the active tower
         activeTower.getTab.push(activeDisc);
         // update the discNumber of the active tower
@@ -267,50 +301,136 @@ class Grid {
         // update position
         activeTower.setDiscPosition();
         // release the click
-        // clicked = false;
+        canClick = true;
     }
-    getActiveDisc(){
-        for (let i=0; i<this.towers.length; i++){
-            let {activeDisc, index} = this.towers[p].getActiveDisc();
-            if(activeDisc != "none"){
+    getActiveDisc() {
+        for (let i = 0; i < this.towers.length; i++) {
+            let { activeDisc, index } = this.towers[p].getActiveDisc();
+            if (activeDisc != "none") {
                 return activeDisc;
             }
         }
         return "none";
     }
+    async move(label1, label2) {
+        // get the first element of the tower labelled label1
+        let tower1 = this.towers[label1];
+        let tower2 = this.towers[label2];
+        let tab1 = tower1.getTab;
+        let tab2 = tower2.getTab;
+        if (tab1.length == 0) {
+            return false;
+        }
+
+        else if (tab2.length > 0) {
+            if (tab2[tab2.length - 1].getLen > tab1[tab1.length - 1].getLen) {
+                let { lastActiveTower, index } = this.getActiveTower();
+                // deactivate the last active tower
+                this.getTowers[index].setActive = false;
+                // activate tower2
+                this.towers[label2].setActive = true;
+                // simulate click using the handleClick method
+                await new Promise((resolve, reject) => {
+                    tab1[tab1.length - 1].handleClick()
+                    setTimeout(resolve, 200);
+                });
+                // Simulate keydown ArrowRight event
+                // Place the active disc at the top of the active tower
+                let rect = tower2.getBase.getBoundingClientRect();
+                let width = parseInt(tab1[tab1.length - 1].getElt.style.width.split('px')[0]);
+                tab1[tab1.length - 1].setPosY = rect.left + Math.floor((rect.width - width) / 2);
+                await new Promise((resolve, reject) => {
+                    tab1[tab1.length - 1].updatePos();
+                    setTimeout(resolve, 200);
+                });
+                // Simulate keydown ArrowDown event
+                this.handleDiscExchange(tower2, tower1.getLastDisc());
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+        else {
+            let { lastActiveTower, index } = this.getActiveTower();
+            // deactivate the last active tower
+            this.getTowers[index].setActive = false;
+            // activate tower2
+            this.towers[label2].setActive = true;
+            // simulate click using the handleClick method
+            await new Promise((resolve, reject) => {
+                tab1[tab1.length - 1].handleClick()
+                setTimeout(resolve, 200);
+            });
+            // Simulate keydown ArrowRight event
+            // Place the active disc at the top of the active tower
+            let rect = tower2.getBase.getBoundingClientRect();
+            let width = parseInt(tab1[tab1.length - 1].getElt.style.width.split('px')[0]);
+            tab1[tab1.length - 1].setPosY = rect.left + Math.floor((rect.width - width) / 2);
+            await new Promise((resolve, reject) => {
+                tab1[tab1.length - 1].updatePos();
+                setTimeout(resolve, 200);
+            });
+            // Simulate keydown ArrowDown event
+            this.handleDiscExchange(tower2, tower1.getLastDisc());
+            return true;
+        }
+    }
+    async solve(n, D, A, I) {
+        if (n > 0) {
+            await this.solve(n - 1, D, I, A);
+            await this.move(D, A)
+            await this.solve(n - 1, I, A, D);
+        }
+    }
 };
 
-let grid = new Grid(3, 7);
+let grid = new Grid(3, discNumber);
 grid.createTowers();
 grid.place();
 window.addEventListener('click', (e) => {
-    let getActiveTower = grid.getActiveTower();
-    let lastActiveTower = getActiveTower.activeTower;
+    console.log(canClick);
     if (e.target.classList.contains("disc")) {
-        // get the actual position of the mouse
-        let left = e.clientX;
-        let top = e.clientY;
-        // find the tower where the click was done
-        ext:
-        for (let i = 0; i < grid.towerNumber; i++) {
-            let tower = grid.getTowers[i]; // for readability
-            let towerElt = tower.getElt;
-            let rect = towerElt.getBoundingClientRect();
-            if ((rect.top < top & top < rect.top + rect.height)
-                & (rect.left < left & left < rect.left + rect.width)) {
-                lastActiveTower.setActive = false; // first, deactivate the last active tower
-                tower.setActive = true; // then, activate the new one
-                break ext;
-/*                 if(clicked){
-                    lastActiveTower.setActive = false; // first, deactivate the last active tower
-                    tower.setActive = true; // then, activate the new one
+        if (canClick) {
+
+            // Update the active tower
+            let { lastActiveTower, index } = grid.getActiveTower();
+            // get the actual position of the mouse
+            let left = e.clientX;
+            let top = e.clientY;
+            // find the tower where the click was done
+            ext:
+            for (let i = 0; i < grid.towerNumber; i++) {
+                let tower = grid.getTowers[i]; // for readability
+                let towerElt = tower.getElt;
+                let rect = towerElt.getBoundingClientRect();
+                if ((rect.top < top & top < rect.top + rect.height)
+                    & (rect.left < left & left < rect.left + rect.width)) {
+                    grid.getTowers[index].setActive = false; // first, deactivate the last active tower
+                    grid.getTowers[i].setActive = true; // then, activate the new one
                     break ext;
                 }
-                else{
-                    lastActiveTower.setActive = true;
-                 }*/
+
             }
 
+            let indTower = -1;
+            let indDisc = -1;
+            // find the disc having the target as element
+            for (let i = 0; i < grid.towerNumber; i++) {
+                for (let j = 0; j < grid.getTowers[i].getTab.length; j++) {
+                    if (grid.getTowers[i].getTab[j].getLen == e.target.id) {
+                        indTower = i;
+                        indDisc = j;
+                    }
+                }
+            }
+            if (grid.getTowers[indTower].getTab[indDisc].isFirst) {
+                grid.getTowers[indTower].getTab[indDisc].posX = container.offsetTop;
+                grid.getTowers[indTower].getTab[indDisc].updatePos();
+                grid.getTowers[indTower].getTab[indDisc].addActiveClass();
+                grid.getTowers[indTower].getTab[indDisc].addFirstClass();
+                canClick = false;
+            }
         }
     }
 });
@@ -320,13 +440,11 @@ window.addEventListener("keydown", (e) => { // Listening to the keydown event
     if (e.key == "ArrowRight") {
         // Find the active tower
         let { activeTower, index } = grid.getActiveTower();
-        console.log("active tower : ");
-        console.log(activeTower);
         let towers = grid.getTowers;
-        if (towers[index+1] != undefined) {
+        if (towers[index + 1] != undefined) {
             activeTower.setActive = false;
-            towers[index+1].setActive = true;
-            activeTower = towers[index+1]
+            towers[index + 1].setActive = true;
+            activeTower = towers[index + 1]
         }
         // Place the active disc at the top of the active tower
         /// Find the active disc
@@ -348,8 +466,8 @@ window.addEventListener("keydown", (e) => { // Listening to the keydown event
         let towers = grid.getTowers;
         if (towers[index - 1] != undefined) {
             activeTower.setActive = false;
-            towers[index-1].setActive = true;
-            activeTower = towers[index-1];
+            towers[index - 1].setActive = true;
+            activeTower = towers[index - 1];
         }
         /// Find the active disc
         ext1:
@@ -379,6 +497,7 @@ window.addEventListener("keydown", (e) => { // Listening to the keydown event
                     if (activeTower == towers[label]) {
                         // update position
                         activeTower.setDiscPosition()
+                        canClick = true;
                         break ext1;
                     }
                     // check if there is already a smaller disc 
@@ -386,6 +505,7 @@ window.addEventListener("keydown", (e) => { // Listening to the keydown event
                     let lenCurrent = activeDisc.getLen;
                     if (lenActive > 0) {
                         if (activeTower.getTab[lenActive - 1].getLen >= lenCurrent) {
+
                             grid.handleDiscExchange(activeTower, activeDisc);
                             break ext1;
                         }
@@ -398,4 +518,13 @@ window.addEventListener("keydown", (e) => { // Listening to the keydown event
             }
         }
     }
+});
+
+solve.addEventListener("click", (e) => {
+    e.preventDefault();
+    grid.solve(grid.discNumber, 0, 2, 1);
+});
+init.addEventListener("click", (e) => {
+    e.preventDefault();
+    grid.init();
 });
